@@ -1,0 +1,17 @@
+[package]
+name = "libgen-tui"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+colored = "3.0.0"
+env_logger = "0.11.8"
+futures = "0.3.31"
+log = "0.4.27"
+ratatui = "0.29.0"
+reqwest = "0.12.15"
+scraper = "0.23.1"
+thiserror = "2.0.12"
+tokio = { version = "1.44.2", features = ["full"] }
+tui-textarea = "0.7.0"
+urlencoding = "2.1.3"
