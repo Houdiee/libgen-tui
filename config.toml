@@ -1,0 +1,7 @@
+[destination]
+path = "~/mylovelybooks/"
+
+[search]
+max_results = 25 # Can be either 25, 50, or 100
+filter = "title" # Can be either title,author,year,publisher,isbn,language,md5
+mirrors = [ "libgen.is" "libgen.rs" ]

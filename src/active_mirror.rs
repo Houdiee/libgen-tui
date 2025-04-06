@@ -1,4 +1,5 @@
 use colored::Colorize;
+use config::Config;
 use futures::{future::select_all, FutureExt};
 use log::info;
 use reqwest::{Client, Response};
@@ -41,6 +42,9 @@ pub async fn check_mirrors_and_return_active(
         }
     }
 
-    println!("{}", "Failed to connect to mirrors.".red());
+    println!(
+        "{}",
+        "Failed to connect to mirrors. Is the mirror accessible? (Note: only secure http protocol is allowed)".red()
+    );
     Err(Error::NoActiveMirror)
 }

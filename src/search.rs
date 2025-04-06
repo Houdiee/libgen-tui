@@ -8,9 +8,13 @@ pub async fn return_books_from_search(
     mirror: &str,
     query: &str,
     client: Client,
+    max_results: usize,
 ) -> Result<Vec<Book>, reqwest::Error> {
     let encode = encode(query);
-    let url = format!("https://{}/search.php?req={}", mirror, encode);
+    let url = format!(
+        "https://{}/search.php?req={}&res={}",
+        mirror, encode, max_results
+    );
     let body = client.get(url).send().await?.text().await?;
 
     let document = Html::parse_document(&body);

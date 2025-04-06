@@ -1,22 +1,28 @@
-use std::env;
+use std::sync::Arc;
 
-use active_mirror::check_mirrors_and_return_active;
-use app::{App, Focus};
-use download::download_book;
-use download_url::return_download_url;
+use futures::lock::Mutex;
 use ratatui::{
     crossterm::event::{self, Event, KeyCode},
-    layout::{Alignment, Constraint, Direction, Flex, Layout, Rect},
-    style::{Color, Modifier, Style, Styled, Stylize},
-    widgets::{block::Title, Block, BorderType, Borders, Cell, Clear, Paragraph, Row, Table, Wrap},
-    DefaultTerminal, Frame,
+    style::{Color, Style},
+    DefaultTerminal,
 };
+
+use std::env;
+
+const MIN_QUERY_LEN: usize = 2;
+
+use active_mirror::check_mirrors_and_return_active;
+use app::{App, DownloadStatus, Focus};
+use download::download_book;
+use download_url::return_download_url;
+use draw::draw;
 use search::return_books_from_search;
 
 mod active_mirror;
 mod app;
 mod download;
 mod download_url;
+mod draw;
 mod search;
 
 #[tokio::main]
@@ -26,14 +32,12 @@ async fn main() {
 
     let mut app = App::new();
 
-    let mirrors = vec!["libgen.lol", "libgen.is", "libgen.rs"]
-        .into_iter()
-        .map(|s| s.to_string())
-        .collect();
-
-    let mirror = tokio::spawn(check_mirrors_and_return_active(app.client.clone(), mirrors))
-        .await
-        .expect("Failed to check_mirrors.");
+    let mirror = tokio::spawn(check_mirrors_and_return_active(
+        app.client.clone(),
+        app.config.mirrors.clone(),
+    ))
+    .await
+    .expect("Failed to check_mirrors.");
 
     match &mirror {
         Ok(m) => app.active_mirror = Some(String::from(m)),
@@ -60,11 +64,15 @@ pub async fn run(mut terminal: DefaultTerminal, app: &mut App) {
                     match key.code {
                         KeyCode::Esc => app.focus = Focus::Nothing,
                         KeyCode::Tab => {
-                            app.focus = Focus::Table;
-                            app.search_bar
-                                .set_cursor_style(Style::default().bg(Color::Reset));
+                            if !app.search_results.is_empty() {
+                                app.search_bar
+                                    .set_cursor_style(Style::default().bg(Color::Reset));
+                                app.focus = Focus::Table;
+                            }
                         }
                         KeyCode::Enter => {
+                            app.first_query = false;
+                            app.query_too_short = false;
                             app.searching = true;
                             app.focus = Focus::Table;
                             app.search_bar
@@ -83,18 +91,29 @@ pub async fn run(mut terminal: DefaultTerminal, app: &mut App) {
                             let query = app.query.to_owned().unwrap();
                             let client = app.client.to_owned();
 
-                            let results = return_books_from_search(&mirror, &query, client)
+                            if query.len() >= MIN_QUERY_LEN {
+                                let results = return_books_from_search(
+                                    &mirror,
+                                    &query,
+                                    client,
+                                    app.config.max_results.clone(),
+                                )
                                 .await
                                 .unwrap();
 
-                            if !results.is_empty() {
-                                app.table_state.select(Some(0));
+                                if !results.is_empty() {
+                                    app.table_state.select(Some(0));
+                                    app.focus = Focus::Table;
+                                } else {
+                                    app.table_state.select(None);
+                                    app.focus = Focus::SearchBar;
+                                }
+
+                                app.search_results = results;
                             } else {
-                                app.table_state.select(None);
+                                app.query_too_short = true;
                                 app.focus = Focus::SearchBar;
                             }
-
-                            app.search_results = results;
                             app.searching = false;
                         }
                         _ => {
@@ -144,7 +163,7 @@ pub async fn run(mut terminal: DefaultTerminal, app: &mut App) {
                 },
 
                 Focus::PopupYes => match key.code {
-                    KeyCode::Tab => {
+                    KeyCode::Tab | KeyCode::Left | KeyCode::Char('h') | KeyCode::Char('j') => {
                         app.focus = Focus::PopupCancel;
                     }
 
@@ -156,24 +175,43 @@ pub async fn run(mut terminal: DefaultTerminal, app: &mut App) {
                     KeyCode::Enter => {
                         if let Some(selected) = app.table_state.selected() {
                             let selected_book = app.search_results[selected].clone();
-                            let md5 = selected_book.md5;
-
+                            let title = selected_book.title.clone();
+                            let md5 = selected_book.md5.clone();
                             let client_clone = app.client.clone();
+                            let extension = selected_book.extension.clone();
+                            let download_dir = app.config.download_directory.clone();
+
+                            let downloads = Arc::clone(&app.downloads);
+                            app.downloads
+                                .lock()
+                                .unwrap()
+                                .insert(title.clone(), DownloadStatus::Pending);
+
                             tokio::spawn(async move {
                                 match return_download_url(md5.clone(), client_clone).await {
                                     Ok(url) => {
-                                        let filename =
-                                            format!("{}.{}", md5, selected_book.extension);
-                                        let destination = filename.as_str();
+                                        let filename = format!("{}.{}", md5, extension);
 
-                                        if let Err(e) = download_book(&url, destination).await {
+                                        let destination = if download_dir.ends_with("/") {
+                                            format!("{}{}", download_dir, filename)
+                                        } else {
+                                            format!("{}/{}", download_dir, filename)
+                                        };
+
+                                        if let Err(e) = download_book(&url, &destination).await {
                                             eprintln!("Error downloading book: {}", e);
                                         } else {
-                                            println!("Download complete: {}", destination);
+                                            downloads
+                                                .lock()
+                                                .unwrap()
+                                                .insert(title.clone(), DownloadStatus::Completed);
                                         }
                                     }
-                                    Err(e) => {
-                                        eprintln!("Error getting download URL: {}", e);
+                                    Err(_) => {
+                                        downloads
+                                            .lock()
+                                            .unwrap()
+                                            .insert(title.clone(), DownloadStatus::Failed);
                                     }
                                 }
                             });
@@ -185,10 +223,10 @@ pub async fn run(mut terminal: DefaultTerminal, app: &mut App) {
                 },
 
                 Focus::PopupCancel => match key.code {
-                    KeyCode::Tab | KeyCode::Char('q') => {
+                    KeyCode::Tab | KeyCode::Right | KeyCode::Char('l') | KeyCode::Char('k') => {
                         app.focus = Focus::PopupYes;
                     }
-                    KeyCode::Esc => {
+                    KeyCode::Esc | KeyCode::Char('q') => {
                         app.show_popup = false;
                         app.focus = Focus::Table;
                     }
@@ -206,192 +244,3 @@ pub async fn run(mut terminal: DefaultTerminal, app: &mut App) {
         }
     }
 }
-
-pub fn draw(frame: &mut Frame, app: &mut App) {
-    let layout = Layout::vertical([
-        Constraint::Length(3),
-        Constraint::Percentage(90),
-        Constraint::Percentage(10),
-    ]);
-    let chunks = layout.split(frame.area());
-
-    let mut search_bar = app.search_bar.clone();
-    let search_bar_border_style = return_border_color(app, Focus::SearchBar);
-    search_bar.set_block(
-        Block::default()
-            .borders(Borders::ALL)
-            .border_type(BorderType::Rounded)
-            .border_style(search_bar_border_style)
-            .title(Title::from("Search"))
-            .title_alignment(Alignment::Left),
-    );
-    search_bar.set_placeholder_text("Title");
-    frame.render_widget(&search_bar, chunks[0]);
-
-    let rows: Vec<_> = app
-        .search_results
-        .iter()
-        .map(|b| {
-            Row::new(vec![
-                b.clone().title,
-                b.clone().author,
-                b.clone().publisher,
-                b.clone().year,
-                b.clone().pages,
-                b.clone().languages,
-                b.clone().size,
-                b.clone().extension,
-            ])
-        })
-        .collect();
-
-    let header = [
-        Cell::from("Title").fg(Color::Red),
-        Cell::from("Author").fg(Color::Yellow),
-        Cell::from("Publisher").fg(Color::Green),
-        Cell::from("Year").fg(Color::Cyan),
-        Cell::from("Pages").fg(Color::LightBlue),
-        Cell::from("Languages").fg(Color::Blue),
-        Cell::from("Size").fg(Color::LightMagenta),
-        Cell::from("Extension").fg(Color::Magenta),
-    ];
-
-    let widths = [
-        Constraint::Percentage(20),
-        Constraint::Percentage(20),
-        Constraint::Percentage(20),
-        Constraint::Percentage(10),
-        Constraint::Percentage(10),
-        Constraint::Percentage(10),
-        Constraint::Percentage(10),
-        Constraint::Percentage(10),
-    ];
-
-    let table_border_style = return_border_color(&app, Focus::Table);
-    let table = Table::new(rows, widths)
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .border_type(BorderType::Rounded)
-                .border_style(table_border_style)
-                .title(Title::from("Results"))
-                .title_alignment(Alignment::Left)
-                .title_bottom(
-                    format!("[Connected to {}]", app.active_mirror.clone().unwrap()).white(),
-                ),
-        )
-        .widths(widths)
-        .row_highlight_style(table_border_style.add_modifier(Modifier::BOLD))
-        .highlight_symbol("> ")
-        .header(Row::new(header));
-
-    let loading = Paragraph::new("Searching...")
-        .set_style(Style::default().fg(Color::Yellow))
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .border_type(BorderType::Rounded)
-                .border_style(Style::new().white())
-                .title(Title::from("Results"))
-                .title_alignment(Alignment::Left)
-                .title_bottom(
-                    format!("[Connected to {}]", app.active_mirror.clone().unwrap()).white(),
-                ),
-        );
-
-    if app.show_popup {
-        if let Some(index) = app.table_state.selected() {
-            let selected_book = app.search_results[index].clone();
-
-            let popup_msg = format!(
-                "Confirm installation for '{}' by '{}'?",
-                selected_book.title, selected_book.author
-            );
-
-            let block = Paragraph::new(popup_msg)
-                .centered()
-                .wrap(Wrap { trim: true })
-                .block(
-                    Block::default()
-                        .borders(Borders::all())
-                        .border_type(BorderType::Rounded)
-                        .border_style(Style::new().blue()),
-                );
-
-            let area = popup_area(frame.area(), 30, 25);
-            frame.render_widget(Clear, area);
-
-            let inner_layout = Layout::new(
-                Direction::Vertical,
-                [Constraint::Percentage(75), Constraint::Percentage(25)],
-            )
-            .split(area);
-
-            frame.render_widget(block, inner_layout[0]);
-
-            let button_layout = Layout::new(
-                Direction::Horizontal,
-                [Constraint::Percentage(50), Constraint::Percentage(50)],
-            )
-            .split(inner_layout[1]);
-
-            let cancel_button_style = return_border_color(app, Focus::PopupCancel);
-            let cancel_button = Paragraph::new("Cancel")
-                .centered()
-                .set_style(Color::Red)
-                .block(
-                    Block::default()
-                        .borders(Borders::all())
-                        .border_type(BorderType::Rounded)
-                        .border_style(cancel_button_style),
-                );
-
-            let yes_button_style = return_border_color(app, Focus::PopupYes);
-            let yes_button = Paragraph::new("Install")
-                .centered()
-                .set_style(Color::Green)
-                .block(
-                    Block::default()
-                        .borders(Borders::all())
-                        .border_type(BorderType::Rounded)
-                        .border_style(yes_button_style),
-                );
-
-            frame.render_widget(cancel_button, button_layout[0]);
-            frame.render_widget(yes_button, button_layout[1]);
-        }
-    }
-
-    if app.searching {
-        frame.render_widget(loading, chunks[1]);
-    } else {
-        frame.render_stateful_widget(table, chunks[1], &mut app.table_state)
-    }
-}
-
-pub fn popup_area(area: Rect, percent_x: u16, percent_y: u16) -> Rect {
-    let vertical = Layout::vertical([Constraint::Percentage(percent_y)]).flex(Flex::Center);
-    let horizontal = Layout::horizontal([Constraint::Percentage(percent_x)]).flex(Flex::Center);
-    let [area] = vertical.areas(area);
-    let [area] = horizontal.areas(area);
-    area
-}
-
-pub fn return_border_color(app: &App, focus_target: Focus) -> Style {
-    let mut focused_color = Style::new().blue();
-    let unfocused_color = Style::new().white();
-
-    if focus_target == Focus::PopupYes {
-        focused_color = Style::new().green();
-    }
-    if focus_target == Focus::PopupCancel {
-        focused_color = Style::new().green();
-    }
-
-    if app.focus == focus_target {
-        focused_color
-    } else {
-        unfocused_color
-    }
-}
-
