@@ -186,7 +186,7 @@ pub async fn run(mut terminal: DefaultTerminal, app: &mut App) {
                                 app.downloads
                                     .lock()
                                     .unwrap()
-                                    .insert(title.clone(), DownloadStatus::Pending);
+                                    .insert((title.clone(), md5.clone()), DownloadStatus::Pending);
 
                                 tokio::spawn(async move {
                                     match return_download_url(md5.clone(), client_clone).await {
@@ -205,16 +205,16 @@ pub async fn run(mut terminal: DefaultTerminal, app: &mut App) {
                                                 eprintln!("Error downloading book: {}", e);
                                             } else {
                                                 downloads.lock().unwrap().insert(
-                                                    title.clone(),
+                                                    (title.clone(), md5.clone()),
                                                     DownloadStatus::Completed,
                                                 );
                                             }
                                         }
                                         Err(_) => {
-                                            downloads
-                                                .lock()
-                                                .unwrap()
-                                                .insert(title.clone(), DownloadStatus::Failed);
+                                            downloads.lock().unwrap().insert(
+                                                (title.clone(), md5.clone()),
+                                                DownloadStatus::Failed,
+                                            );
                                         }
                                     }
                                 });

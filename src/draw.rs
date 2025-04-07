@@ -179,9 +179,9 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
 
     let downloads_lock = app.downloads.lock().unwrap();
 
-    let downloads_rows: Vec<_> = downloads_lock
+    let mut downloads_rows: Vec<_> = downloads_lock
         .iter()
-        .map(|(title, completed)| {
+        .map(|((title, _md5), completed)| {
             let (text, style) = match completed {
                 DownloadStatus::Pending => ("Downloading...", Color::Yellow),
                 DownloadStatus::Completed => ("Download complete!", Color::Green),
@@ -194,6 +194,7 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
             ])
         })
         .collect();
+    downloads_rows.reverse();
 
     let downloads_table = Table::new(
         downloads_rows,

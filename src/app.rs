@@ -13,7 +13,6 @@ use serde::{Deserialize, Serialize};
 use tui_textarea::TextArea;
 use xdg::BaseDirectories;
 
-#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct App {
     pub client: Client,
@@ -27,7 +26,7 @@ pub struct App {
     pub searching: bool,
     pub table_state: TableState,
     pub show_popup: bool,
-    pub downloads: Arc<Mutex<HashMap<String, DownloadStatus>>>,
+    pub downloads: Arc<Mutex<HashMap<(String, String), DownloadStatus>>>,
     pub query_too_short: bool,
     pub first_query: bool,
     pub config: AppConfig,
@@ -40,7 +39,6 @@ pub struct AppConfig {
     pub max_results: usize,
 }
 
-#[allow(dead_code)]
 impl AppConfig {
     pub fn new() -> Self {
         let xdg_dirs = BaseDirectories::with_prefix("libgen-tui").unwrap();
@@ -117,7 +115,6 @@ pub enum DownloadStatus {
     Failed,
 }
 
-#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct Book {
     pub id: String,
