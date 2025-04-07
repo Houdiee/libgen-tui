@@ -6,6 +6,7 @@ use std::{
 };
 
 use config::{Config, File, FileFormat};
+use dir::home_dir;
 use ratatui::widgets::TableState;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
@@ -44,11 +45,12 @@ impl AppConfig {
     pub fn new() -> Self {
         let xdg_dirs = BaseDirectories::with_prefix("libgen-tui").unwrap();
         let config_path = xdg_dirs.place_config_file("config.toml").unwrap();
+        let home_dir = home_dir().expect("Failed to get user's home directory.");
 
         if !config_path.exists() {
             let default_config = AppConfig {
                 mirrors: vec!["libgen.is".to_string(), "libgen.rs".to_string()],
-                download_directory: "libgen".to_string(),
+                download_directory: format!("{}/{}", home_dir.to_str().unwrap(), "libgen-tui"),
                 max_results: 50,
             };
             std::fs::write(&config_path, toml::to_string(&default_config).unwrap()).unwrap();

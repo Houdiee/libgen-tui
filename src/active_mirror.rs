@@ -1,5 +1,4 @@
 use colored::Colorize;
-use config::Config;
 use futures::{future::select_all, FutureExt};
 use log::info;
 use reqwest::{Client, Response};

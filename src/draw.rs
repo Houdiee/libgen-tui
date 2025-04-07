@@ -206,7 +206,7 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
             .title_top(Line::from("Downloads").left_aligned())
             .title_bottom(
                 Line::from(
-                    "[ h,j,k,l = left,down,right,left | Tab = switch pane | Enter = submit | Esc = no focus | q = quit ]",
+                    "[ h,j,k,l = left,down,right,left | Tab = switch pane | Enter = submit | / = search | Esc = escape | q = quit ]",
                 )
                 .left_aligned(),
             )
