@@ -1,5 +1,6 @@
-use std::{sync::Arc, time::Duration};
+use std::time::Duration;
 
+use install_book::install_book;
 use ratatui::{
     crossterm::event::{self, poll, Event, KeyCode},
     style::{Color, Style},
@@ -12,8 +13,6 @@ const MIN_QUERY_LEN: usize = 2;
 
 use active_mirror::check_mirrors_and_return_active;
 use app::{App, DownloadStatus, Focus};
-use download::download_book;
-use download_url::return_download_url;
 use draw::draw;
 use search::return_books_from_search;
 
@@ -22,6 +21,7 @@ mod app;
 mod download;
 mod download_url;
 mod draw;
+mod install_book;
 mod search;
 
 #[tokio::main]
@@ -153,10 +153,32 @@ pub async fn run(mut terminal: DefaultTerminal, app: &mut App) {
                             }
                         }
 
+                        KeyCode::Char('g') => {
+                            if let Some(_index) = app.table_state.selected() {
+                                app.table_state.select_first();
+                            }
+                        }
+
+                        KeyCode::Char('G') => {
+                            if let Some(_index) = app.table_state.selected() {
+                                app.table_state.select_last();
+                            }
+                        }
+
                         KeyCode::Enter => {
                             if let Some(_) = app.table_state.selected() {
                                 app.show_popup = true;
                                 app.focus = Focus::PopupYes;
+                            }
+                        }
+
+                        KeyCode::Char(' ') => {
+                            install_book(app).await;
+                            if let Some(index) = app.table_state.selected() {
+                                if app.search_results.len() - 1 > index {
+                                    let increment_index = index + 1;
+                                    app.table_state.select(Some(increment_index));
+                                }
                             }
                         }
                         _ => {}
@@ -173,52 +195,7 @@ pub async fn run(mut terminal: DefaultTerminal, app: &mut App) {
                         }
 
                         KeyCode::Enter => {
-                            if let Some(selected) = app.table_state.selected() {
-                                let selected_book = app.search_results[selected].clone();
-                                let title = selected_book.title.clone();
-                                let title_formatted = title.clone().replace(" ", "_");
-                                let md5 = selected_book.md5.clone();
-                                let client_clone = app.client.clone();
-                                let extension = selected_book.extension.clone();
-                                let download_dir = app.config.download_directory.clone();
-
-                                let downloads = Arc::clone(&app.downloads);
-                                app.downloads
-                                    .lock()
-                                    .unwrap()
-                                    .insert((title.clone(), md5.clone()), DownloadStatus::Pending);
-
-                                tokio::spawn(async move {
-                                    match return_download_url(md5.clone(), client_clone).await {
-                                        Ok(url) => {
-                                            let filename =
-                                                format!("{}.{}", title_formatted, extension);
-
-                                            let destination = if download_dir.ends_with("/") {
-                                                format!("{}{}", download_dir, filename)
-                                            } else {
-                                                format!("{}/{}", download_dir, filename)
-                                            };
-
-                                            if let Err(e) = download_book(&url, &destination).await
-                                            {
-                                                eprintln!("Error downloading book: {}", e);
-                                            } else {
-                                                downloads.lock().unwrap().insert(
-                                                    (title.clone(), md5.clone()),
-                                                    DownloadStatus::Completed,
-                                                );
-                                            }
-                                        }
-                                        Err(_) => {
-                                            downloads.lock().unwrap().insert(
-                                                (title.clone(), md5.clone()),
-                                                DownloadStatus::Failed,
-                                            );
-                                        }
-                                    }
-                                });
-                            }
+                            install_book(app).await;
                             app.show_popup = false;
                             app.focus = Focus::Table;
                         }

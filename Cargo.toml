@@ -2,6 +2,17 @@
 name = "libgen-tui"
 version = "0.1.0"
 edition = "2021"
+license = "MIT"
+description = "terminal user interface for libgen (library genesis) to download ebooks over the internet from the terminal"
+
+[package.metadata.deb]
+maintainer = "Houdiee <kerimugurlu24@gmail.com>"
+copyright = "2025, Houdiee Tan <kerimugurlu24@gmail.com>"
+depends = "$auto"
+license-file = [ "LICENSE", "3" ]
+
+[package.metadata.generate-rpm]
+assets = [ { source = "target/release/libgen-tui", dest = "/usr/bin/libgen-tui", mode = "755" } ]
 
 [dependencies]
 colored = "3.0.0"
