@@ -1,5 +1,6 @@
 # Libgen TUI - Download books over the terminal
 ![](./assets/showcase.png)
+![](./assets/showcase1.png)
 
 ## Features
 - asynchronous downloads allowing multiple downloads at the same time
