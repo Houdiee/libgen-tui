@@ -2,8 +2,7 @@
 ![](./assets/showcase.png)
 
 ## Features
-- asynchronous downloads allowing multiple downloads at the same time
-- automatic resizing depending on terminal screen size
+- asynchronous downloads allowing multiple books at the same time
 - configurable download directory
 
 ## Installation
