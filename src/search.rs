@@ -74,7 +74,6 @@ pub async fn return_books_from_search(
         }
     }
 
-    assert!(!books.is_empty());
     if !books.is_empty() {
         books.remove(0);
     }
