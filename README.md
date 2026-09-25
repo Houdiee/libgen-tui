@@ -19,7 +19,7 @@ If you are struggling to build on nixos, run `nix-shell` within the project dire
 ## Configuration
 By default, running `libgen-tui` will create a configuration file at `$XDG_CONFIG_HOME/libgen-tui/config.toml` if there isn't one. Below is the defaut configuration:
 ```toml
-mirrors = ["libgen.li", "libgen.vg", "libgen.la", "libgen.bz"] # Feel free to remove or add mirrors if searching isn't working properly
+mirrors = ["libgen.li", "libgen.vg", "libgen.la", "libgen.bz"] # Which libgen domains to use
 download_directory = "/home/{user}/libgen-tui" # The default download path, where all books will be downloaded to 
 max_results = 50 # How many results to display. Accepted values are 25, 50 or 100
 ```
@@ -29,7 +29,7 @@ If an existing config still lists older mirrors such as `libgen.is` or `libgen.r
 ## Troubleshooting
 Libgen changes its domains and page layout from time to time, which breaks searching or downloading. To find out which stage broke, run the live tests:
 ```sh
-cargo test --test pipeline -- --ignored --nocapture
+cargo test
 ```
 They check mirror reachability, result parsing, download-link resolution and an actual download, and report which one fails.
 
