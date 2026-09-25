@@ -8,17 +8,6 @@ Download any book over the internet through the terminal, quick and easy. Withou
 - configurable download directory
 - automatic failover between mirrors when one stops responding
 
-## Keybindings
-| Key | Action |
-| --- | --- |
-| `/` or `Tab` | focus the search bar |
-| `Enter` | search, or confirm the install dialog |
-| `j` / `k` (or arrows) | move through results |
-| `g` / `G` | jump to first / last result |
-| `Space` | install the highlighted book without confirming |
-| `Esc` | unfocus the current pane |
-| `q` or `Ctrl+C` | quit |
-
 ## Installation
 1. `git clone https://github.com/Houdiee/libgen-tui`
 2. `cd libgen-tui` && `cargo build --release`
@@ -40,7 +29,7 @@ If an existing config still lists older mirrors such as `libgen.is` or `libgen.r
 ## Troubleshooting
 Libgen changes its domains and page layout from time to time, which breaks searching or downloading. To find out which stage broke, run the live tests:
 ```sh
-cargo test --test live_smoke -- --ignored --nocapture
+cargo test --test pipeline -- --ignored --nocapture
 ```
 They check mirror reachability, result parsing, download-link resolution and an actual download, and report which one fails.
 
