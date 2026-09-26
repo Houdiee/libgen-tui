@@ -31,23 +31,30 @@ Make sure `~/.local/bin` is on your `$PATH`, or use `sudo install -m755 libgen-t
 ```sh
 tar -xzf libgen-tui-*-apple-darwin.tar.gz
 cd libgen-tui-*-apple-darwin
-sudo install -m755 libgen-tui /usr/local/bin/
+mkdir -p ~/.local/bin && install -m755 libgen-tui ~/.local/bin/
 ```
+Make sure `~/.local/bin` is on your `$PATH`, or use `sudo install -m755 libgen-tui /usr/local/bin/` to install it for every user instead.
+
 The binaries are not signed, so macOS quarantines anything downloaded from a browser. If you get *"cannot be opened because the developer cannot be verified"*, clear the flag:
 ```sh
-xattr -d com.apple.quarantine /usr/local/bin/libgen-tui
+xattr -d com.apple.quarantine ~/.local/bin/libgen-tui
 ```
 
 #### Windows
-In PowerShell, extract the `.zip`, move `libgen-tui.exe` somewhere permanent and put that folder on your `PATH`:
+Extract the `.zip` and run `libgen-tui.exe`. There is nothing to install.
+
+The binary is not code-signed, so Windows shows a *"Windows protected your PC"* screen the first time. Click **More info**, then **Run anyway**.
+
+Use Windows Terminal rather than the legacy console host, which renders the interface poorly.
+
+Optionally, to launch it as `libgen-tui` from any terminal, move it somewhere permanent and add that folder to your `PATH` in PowerShell:
 ```powershell
-Expand-Archive .\libgen-tui-*-x86_64-pc-windows-msvc.zip -DestinationPath .
 $dest = "$env:LOCALAPPDATA\Programs\libgen-tui"
 New-Item -ItemType Directory -Force -Path $dest
 Move-Item .\libgen-tui-*-x86_64-pc-windows-msvc\libgen-tui.exe $dest
 [Environment]::SetEnvironmentVariable("Path", "$([Environment]::GetEnvironmentVariable('Path','User'));$dest", "User")
 ```
-Reopen your terminal afterwards. Use Windows Terminal rather than the legacy console host, which renders the interface poorly.
+Reopen your terminal afterwards.
 
 ### From source
 Needs a [Rust toolchain](https://rustup.rs). There is no OpenSSL or other system dependency to install first.
