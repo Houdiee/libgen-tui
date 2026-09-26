@@ -5,8 +5,8 @@ pkgs.mkShell {
   nativeBuildInputs = with pkgs.buildPackages; [
     cargo
     rustc
-    openssl
-    pkg-config
+    rustfmt
+    clippy
     gcc
     dpkg
   ];

@@ -15,37 +15,49 @@ async fn pipeline_works_end_to_end() {
         .await
         .expect("search failed");
     assert!(!books.is_empty(), "search returned no books");
+    println!("{} books from {}", books.len(), served_by);
 
     let book = &books[0];
-    println!(
-        "{} books from {}; first: {:?} ({} {}) md5={}",
-        books.len(),
-        served_by,
-        book.title,
-        book.size,
-        book.extension,
-        book.md5
-    );
-
     assert!(!book.title.is_empty(), "title was not parsed");
     assert_eq!(book.md5.len(), 32, "md5 was not parsed: {:?}", book.md5);
     assert!(!book.extension.is_empty(), "extension was not parsed");
 
-    let url = download::resolve_url_with_failover(&client, &mirrors, &served_by, &book.md5)
-        .await
-        .expect("could not resolve a download url");
-    assert!(url.contains("key="), "download url carries no key: {}", url);
-
     let destination = std::env::temp_dir().join("libgen-tui-pipeline-test.bin");
-    download::download_to_file(&client, &url, &destination)
-        .await
-        .expect("download failed");
+    let mut failures = Vec::new();
 
-    let written = std::fs::metadata(&destination)
-        .expect("file was not written")
-        .len();
-    println!("downloaded {} bytes", written);
-    assert!(written > 1024, "download was suspiciously small");
+    for book in books.iter().take(5) {
+        let url =
+            match download::resolve_url_with_failover(&client, &mirrors, &served_by, &book.md5)
+                .await
+            {
+                Ok(url) => url,
+                Err(e) => {
+                    failures.push(format!("{}: {}", book.title, e));
+                    continue;
+                }
+            };
+        assert!(url.contains("key="), "download url carries no key: {}", url);
 
-    let _ = std::fs::remove_file(&destination);
+        match download::download_to_file(&client, &url, &destination).await {
+            Ok(()) => {
+                let written = std::fs::metadata(&destination)
+                    .expect("file was not written")
+                    .len();
+                println!(
+                    "downloaded {:?}: {} bytes from {}",
+                    book.title, written, url
+                );
+                assert!(written > 1024, "download was suspiciously small");
+                let _ = std::fs::remove_file(&destination);
+                return;
+            }
+            Err(e) => failures.push(format!("{}: {}", book.title, e)),
+        }
+    }
+
+    panic!(
+        "every download failed. A 5xx here is a libgen CDN outage rather than a \
+         problem with this crate; anything else is worth investigating:\n  {}",
+        failures.join("\n  ")
+    );
 }

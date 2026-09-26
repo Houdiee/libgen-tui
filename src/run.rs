@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use ratatui::{
-    crossterm::event::{self, poll, Event},
+    crossterm::event::{self, poll, Event, KeyEventKind},
     DefaultTerminal,
 };
 
@@ -25,6 +25,10 @@ pub async fn run(mut terminal: DefaultTerminal, app: &mut App) {
         let Event::Key(key) = event::read().expect("Failed to read event.") else {
             continue;
         };
+
+        if key.kind != KeyEventKind::Press {
+            continue;
+        }
 
         match handle_key(app, key) {
             Action::None => {}

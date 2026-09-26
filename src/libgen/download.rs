@@ -18,6 +18,8 @@ pub enum DownloadError {
         #[source]
         source: std::io::Error,
     },
+    #[error("mirror served a web page instead of the file")]
+    NotAFile,
 }
 
 pub fn parse_download_href(body: &str) -> Option<String> {
@@ -108,13 +110,19 @@ pub async fn download_to_file(
     url: &str,
     destination: &Path,
 ) -> Result<(), DownloadError> {
-    let content = client
-        .get(url)
-        .send()
-        .await?
-        .error_for_status()?
-        .bytes()
-        .await?;
+    let response = client.get(url).send().await?.error_for_status()?;
+
+    let is_html = response
+        .headers()
+        .get(reqwest::header::CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .is_some_and(|value| value.starts_with("text/html"));
+
+    if is_html {
+        return Err(DownloadError::NotAFile);
+    }
+
+    let content = response.bytes().await?;
 
     let write = async {
         let mut file = File::create(destination).await?;

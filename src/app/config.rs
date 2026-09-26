@@ -1,9 +1,7 @@
 use std::path::PathBuf;
 
 use config::{Config, File, FileFormat};
-use dir::home_dir;
 use serde::{Deserialize, Serialize};
-use xdg::BaseDirectories;
 
 pub const DEFAULT_MIRRORS: [&str; 4] = ["libgen.li", "libgen.vg", "libgen.la", "libgen.bz"];
 
@@ -16,11 +14,11 @@ pub struct AppConfig {
 
 impl Default for AppConfig {
     fn default() -> Self {
-        let home = home_dir().expect("Failed to get user's home directory.");
+        let home = dirs::home_dir().expect("Failed to get user's home directory.");
 
         AppConfig {
             mirrors: DEFAULT_MIRRORS.iter().map(|m| m.to_string()).collect(),
-            download_directory: format!("{}/libgen-tui", home.display()),
+            download_directory: home.join("libgen-tui").display().to_string(),
             max_results: 50,
         }
     }
@@ -44,10 +42,15 @@ impl AppConfig {
             .expect("Failed to deserialize config file.")
     }
 
+    pub fn directory() -> PathBuf {
+        dirs::config_dir()
+            .expect("Failed to resolve the configuration directory.")
+            .join("libgen-tui")
+    }
+
     pub fn path() -> PathBuf {
-        BaseDirectories::with_prefix("libgen-tui")
-            .expect("Failed to resolve XDG directories.")
-            .place_config_file("config.toml")
-            .expect("Failed to place config file.")
+        let directory = Self::directory();
+        std::fs::create_dir_all(&directory).expect("Failed to create the configuration directory.");
+        directory.join("config.toml")
     }
 }

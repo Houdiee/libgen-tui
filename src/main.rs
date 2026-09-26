@@ -6,6 +6,9 @@ use libgen_tui::run::run;
 
 #[tokio::main]
 async fn main() {
+    #[cfg(windows)]
+    let _ = colored::control::set_virtual_terminal(true);
+
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("off")).init();
 
     let mut app = App::new(AppConfig::load());
