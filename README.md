@@ -16,8 +16,7 @@ Grab the archive for your platform from the [latest release](https://github.com/
 | Platform | Asset |
 | --- | --- |
 | Linux (x86_64) | `libgen-tui-<version>-x86_64-unknown-linux-gnu.tar.gz` |
-| macOS (Apple Silicon) | `libgen-tui-<version>-aarch64-apple-darwin.tar.gz` |
-| macOS (Intel) | `libgen-tui-<version>-x86_64-apple-darwin.tar.gz` |
+| macOS (Intel and Apple Silicon) | `libgen-tui-<version>-universal-apple-darwin.tar.gz` |
 | Windows (x86_64) | `libgen-tui-<version>-x86_64-pc-windows-msvc.zip` |
 
 #### Linux

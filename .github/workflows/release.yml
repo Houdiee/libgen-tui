@@ -26,15 +26,15 @@ jobs:
         include:
           - os: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
+            rust_targets: x86_64-unknown-linux-gnu
             archive: tar.gz
           - os: windows-latest
             target: x86_64-pc-windows-msvc
+            rust_targets: x86_64-pc-windows-msvc
             archive: zip
-          - os: macos-13
-            target: x86_64-apple-darwin
-            archive: tar.gz
           - os: macos-latest
-            target: aarch64-apple-darwin
+            target: universal-apple-darwin
+            rust_targets: x86_64-apple-darwin,aarch64-apple-darwin
             archive: tar.gz
 
     steps:
@@ -45,38 +45,50 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.target }}
+          targets: ${{ matrix.rust_targets }}
 
       - uses: Swatinem/rust-cache@v2
         with:
           key: ${{ matrix.target }}
 
       - name: Build
-        run: cargo build --release --locked --target ${{ matrix.target }}
+        shell: bash
+        run: |
+          IFS=',' read -ra TARGETS <<< "${{ matrix.rust_targets }}"
+          for target in "${TARGETS[@]}"; do
+            cargo build --release --locked --target "$target"
+          done
 
-      - name: Package (tar.gz)
-        if: matrix.archive == 'tar.gz'
+      - name: Stage binary
+        shell: bash
+        run: |
+          mkdir -p dist
+          if [ "${{ matrix.target }}" = "universal-apple-darwin" ]; then
+            lipo -create -output dist/libgen-tui \
+              target/x86_64-apple-darwin/release/libgen-tui \
+              target/aarch64-apple-darwin/release/libgen-tui
+            lipo -info dist/libgen-tui
+          elif [ "${{ matrix.archive }}" = "zip" ]; then
+            cp "target/${{ matrix.rust_targets }}/release/libgen-tui.exe" dist/
+          else
+            cp "target/${{ matrix.rust_targets }}/release/libgen-tui" dist/
+          fi
+
+      - name: Package
         shell: bash
         run: |
           VERSION="${{ github.event.inputs.tag || github.ref_name }}"
           STAGE="libgen-tui-${VERSION}-${{ matrix.target }}"
           mkdir -p "$STAGE"
-          cp "target/${{ matrix.target }}/release/libgen-tui" "$STAGE/"
+          cp dist/* "$STAGE/"
           cp README.md LICENSE "$STAGE/"
-          tar -czf "$STAGE.tar.gz" "$STAGE"
-          echo "ASSET=$STAGE.tar.gz" >> "$GITHUB_ENV"
-
-      - name: Package (zip)
-        if: matrix.archive == 'zip'
-        shell: bash
-        run: |
-          VERSION="${{ github.event.inputs.tag || github.ref_name }}"
-          STAGE="libgen-tui-${VERSION}-${{ matrix.target }}"
-          mkdir -p "$STAGE"
-          cp "target/${{ matrix.target }}/release/libgen-tui.exe" "$STAGE/"
-          cp README.md LICENSE "$STAGE/"
-          7z a "$STAGE.zip" "$STAGE"
-          echo "ASSET=$STAGE.zip" >> "$GITHUB_ENV"
+          if [ "${{ matrix.archive }}" = "zip" ]; then
+            7z a "$STAGE.zip" "$STAGE"
+            echo "ASSET=$STAGE.zip" >> "$GITHUB_ENV"
+          else
+            tar -czf "$STAGE.tar.gz" "$STAGE"
+            echo "ASSET=$STAGE.tar.gz" >> "$GITHUB_ENV"
+          fi
 
       - name: Checksum
         shell: bash
