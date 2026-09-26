@@ -77,14 +77,19 @@ On first run `libgen-tui` writes a configuration file if there isn't one already
 
 Below is the default configuration:
 ```toml
-mirrors = ["libgen.li", "libgen.vg", "libgen.la", "libgen.bz"] # Which libgen domains to use
+additional_mirrors = [] # Extra libgen domains to try alongside the built-in ones
 download_directory = "/home/{user}/libgen-tui" # The default download path, where all books will be downloaded to 
 max_results = 50 # How many results to display. Accepted values are 25, 50 or 100
 ```
 
 On Windows, write paths with either forward slashes or escaped backslashes, since TOML treats a single backslash as an escape: `download_directory = "C:/Users/you/Books"`.
 
-If an existing config still lists older mirrors such as `libgen.is` or `libgen.rs`, those domains are gone and searching will fail until the list is updated to the mirrors above.
+### Mirrors
+The libgen domains are built into the binary rather than the config file, because they die and get replaced over time and a config written once would go stale forever. On startup every domain is tried in parallel and the first to answer wins, then the rest of the current family is read off that page — so newly added domains are picked up without updating anything.
+
+Use `additional_mirrors` to add domains of your own, for instance if the built-in ones are blocked where you are. They are raced alongside the built-in list, not used only as a last resort. A domain that answers but does not serve libgen search results is skipped automatically.
+
+Older versions kept a `mirrors` list in this file. That key is now ignored, so an old config picks up the current domains on its own.
 
 ## Troubleshooting
 Libgen changes its domains and page layout from time to time, which breaks searching or downloading. To find out which stage broke, run the live tests:

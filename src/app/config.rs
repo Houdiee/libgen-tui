@@ -3,11 +3,22 @@ use std::path::PathBuf;
 use config::{Config, File, FileFormat};
 use serde::{Deserialize, Serialize};
 
-pub const DEFAULT_MIRRORS: [&str; 4] = ["libgen.li", "libgen.vg", "libgen.la", "libgen.bz"];
+pub const DEFAULT_MIRRORS: [&str; 5] = [
+    "libgen.li",
+    "libgen.la",
+    "libgen.bz",
+    "libgen.gl",
+    "libgen.vg",
+];
+
+pub fn default_mirrors() -> Vec<String> {
+    DEFAULT_MIRRORS.iter().map(|m| m.to_string()).collect()
+}
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct AppConfig {
-    pub mirrors: Vec<String>,
+    #[serde(default)]
+    pub additional_mirrors: Vec<String>,
     pub download_directory: String,
     pub max_results: usize,
 }
@@ -17,7 +28,7 @@ impl Default for AppConfig {
         let home = dirs::home_dir().expect("Failed to get user's home directory.");
 
         AppConfig {
-            mirrors: DEFAULT_MIRRORS.iter().map(|m| m.to_string()).collect(),
+            additional_mirrors: Vec::new(),
             download_directory: home.join("libgen-tui").display().to_string(),
             max_results: 50,
         }

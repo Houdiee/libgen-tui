@@ -60,7 +60,7 @@ async fn perform_search(app: &mut App, query: &str) {
 
     let result = search::search(
         &app.client,
-        &app.config.mirrors,
+        &app.mirrors,
         &mirror,
         query,
         app.config.max_results,

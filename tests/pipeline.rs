@@ -1,19 +1,30 @@
-use libgen_tui::app::config::DEFAULT_MIRRORS;
+use libgen_tui::app::config::default_mirrors;
 use libgen_tui::libgen::{build_client, download, mirror, search};
 
 #[tokio::test]
 async fn pipeline_works_end_to_end() {
     let client = build_client();
-    let mirrors: Vec<String> = DEFAULT_MIRRORS.iter().map(|m| m.to_string()).collect();
+    let builtin = default_mirrors();
 
-    let active = mirror::find_active(&client, &mirrors)
+    let active = mirror::find_active(&client, &builtin)
         .await
         .expect("no mirror is reachable");
-    println!("mirror: {}", active);
+    println!("mirror: {}", active.host);
+    println!("discovered siblings: {:?}", active.siblings);
 
-    let (books, served_by) = search::search(&client, &mirrors, &active, "rust programming", 25)
-        .await
-        .expect("search failed");
+    assert!(
+        !active.siblings.is_empty(),
+        "{} advertised no sibling domains, so mirror discovery has broken",
+        active.host
+    );
+
+    let mirrors = mirror::merge(&[&active.siblings, &builtin]);
+    println!("session mirror list: {:?}", mirrors);
+
+    let (books, served_by) =
+        search::search(&client, &mirrors, &active.host, "rust programming", 25)
+            .await
+            .expect("search failed");
     assert!(!books.is_empty(), "search returned no books");
     println!("{} books from {}", books.len(), served_by);
 
@@ -21,6 +32,25 @@ async fn pipeline_works_end_to_end() {
     assert!(!book.title.is_empty(), "title was not parsed");
     assert_eq!(book.md5.len(), 32, "md5 was not parsed: {:?}", book.md5);
     assert!(!book.extension.is_empty(), "extension was not parsed");
+
+    let populated = |field: fn(&libgen_tui::libgen::Book) -> &String| {
+        books.iter().filter(|b| !field(b).is_empty()).count()
+    };
+    for (name, count) in [
+        ("author", populated(|b| &b.author)),
+        ("year", populated(|b| &b.year)),
+        ("languages", populated(|b| &b.languages)),
+        ("size", populated(|b| &b.size)),
+        ("extension", populated(|b| &b.extension)),
+    ] {
+        assert!(
+            count > books.len() / 2,
+            "column {} resolved for only {}/{} rows, header mapping is off",
+            name,
+            count,
+            books.len()
+        );
+    }
 
     let destination = std::env::temp_dir().join("libgen-tui-pipeline-test.bin");
     let mut failures = Vec::new();

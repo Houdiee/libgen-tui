@@ -29,6 +29,7 @@ pub struct App {
     pub client: Client,
     pub config: AppConfig,
     pub downloads: Downloads,
+    pub mirrors: Vec<String>,
     pub active_mirror: Option<String>,
 
     pub search_bar: TextArea<'static>,
@@ -53,6 +54,7 @@ impl App {
             client: libgen::build_client(),
             config,
             downloads: Downloads::new(),
+            mirrors: config::default_mirrors(),
             active_mirror: None,
             search_bar: TextArea::default(),
             search_results: Vec::new(),
@@ -120,7 +122,7 @@ impl App {
         self.downloads.start(&book.title, &book.md5);
 
         let client = self.client.clone();
-        let mirrors = self.config.mirrors.clone();
+        let mirrors = self.mirrors.clone();
         let downloads = self.downloads.clone();
 
         tokio::spawn(async move {

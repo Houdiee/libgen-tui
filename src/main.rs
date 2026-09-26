@@ -1,5 +1,6 @@
 use colored::Colorize;
 
+use libgen_tui::app::config::default_mirrors;
 use libgen_tui::app::{App, AppConfig};
 use libgen_tui::libgen::mirror;
 use libgen_tui::run::run;
@@ -13,24 +14,27 @@ async fn main() {
 
     let mut app = App::new(AppConfig::load());
 
+    let builtin = default_mirrors();
+    let additional = app.config.additional_mirrors.clone();
+
     println!("{}", "Attempting to connect to libgen mirrors...".yellow());
 
-    match mirror::find_active(&app.client, &app.config.mirrors).await {
-        Some(found) => {
-            println!("{} {}", "Connected to mirror:".green(), found.green());
-            app.active_mirror = Some(found);
-        }
-        None => {
-            eprintln!(
-                "{}\nTried: {}\nEdit the mirror list at {}\nKnown working mirrors: {}",
-                "Failed to connect to any libgen mirror.".red(),
-                app.config.mirrors.join(", "),
-                AppConfig::path().display(),
-                libgen_tui::app::config::DEFAULT_MIRRORS.join(", "),
-            );
-            return;
-        }
-    }
+    let candidates = mirror::merge(&[&builtin, &additional]);
+
+    let Some(active) = mirror::find_active(&app.client, &candidates).await else {
+        eprintln!(
+            "{}\nTried: {}\nAdd working domains to additional_mirrors in {}",
+            "Failed to connect to any libgen mirror.".red(),
+            candidates.join(", "),
+            AppConfig::path().display(),
+        );
+        return;
+    };
+
+    println!("{} {}", "Connected to mirror:".green(), active.host.green());
+
+    app.mirrors = mirror::merge(&[&active.siblings, &builtin, &additional]);
+    app.active_mirror = Some(active.host);
 
     let terminal = ratatui::init();
     run(terminal, &mut app).await;
